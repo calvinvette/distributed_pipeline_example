@@ -1,0 +1,47 @@
+pre-commit:
+  parallel: true
+  commands:
+    ruff:
+      run: ruff check {staged_files} --fix
+      glob: "*.py"
+
+    ruff-format:
+      run: ruff format {staged_files}
+      glob: "*.py"
+
+    mypy:
+      run: mypy .
+      glob: "*.py"
+      pass_files_without_staged: true
+
+lint:
+  parallel: true
+  commands:
+    ruff:
+      run: ruff check .
+      glob: "*.py"
+
+    ruff-format:
+      run: ruff format --check .
+      glob: "*.py"
+
+    mypy:
+      run: mypy .
+      glob: "*.py"
+
+test:
+  parallel: true
+  commands:
+    pytest:
+      run: pytest -v
+      glob: "**/tests/*.py"
+
+infra-validate:
+  parallel: true
+  commands:
+    terraform:
+      run: |
+        cd infra/tofu/aws && terraform init -backend=false -validate
+        cd infra/tofu/eks && terraform init -backend=false -validate
+        cd infra/tofu/openshift && terraform init -backend=false -validate
+        cd infra/tofu/rke2-local && terraform init -backend=false -validate

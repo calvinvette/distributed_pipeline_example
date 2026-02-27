@@ -1,0 +1,41 @@
+name: pre-commit
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          # Keep aligned with your repo/tooling; 3.11 is a safe default.
+          python-version: "3.11"
+
+      # Install uv (official Astral action)
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      # Install pre-commit with pre-commit-uv (so pre-commit uses uv under the hood)
+      - name: Install pre-commit (uv tool)
+        run: |
+          uv tool install pre-commit --with pre-commit-uv --force-reinstall
+          pre-commit --version
+
+      # Cache pre-commit's hook environments to speed up subsequent runs
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: precommit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      # Run all hooks against all files
+      - name: Run pre-commit
+        run: pre-commit run --all-files --show-diff-on-failure

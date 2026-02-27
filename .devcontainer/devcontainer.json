@@ -1,0 +1,116 @@
+{
+  "name": "ImageML Pipeline Development",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/terraform:1": {
+      "version": "1.7.0"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 4,
+        "files.insertFinalNewline": true,
+        "files.trimTrailingWhitespace": true,
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "[terraform]": {
+          "editor.defaultFormatter": "hashicorp.terraform"
+        },
+        "[yaml]": {
+          "editor.defaultFormatter": "redhat.vscode-yaml"
+        },
+        "python.analysis.typeCheckingMode": "basic",
+        "python.linting.enabled": true,
+        "python.linting.ruffEnabled": true,
+        "python.formatting.provider": "black",
+        "files.associations": {
+          "*.tf": "terraform",
+          "*.tfvars": "terraform"
+        }
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.ruff",
+        "redhat.vscode-yaml",
+        "ms-azuretools.vscode-docker",
+        "ms-azuretools.vscode-azurefunctions",
+        "hashicorp.terraform",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "eamodio.gitlens"
+      ]
+    }
+  },
+  "postCreateCommand": "pip install uv && uv pip install -e pipeline_common -e stage1 -e stage2 -e stage3 -e stage4 && echo 'Installing NeoVim Mason LSPs...' && nvim --headless +MasonInstallAll +qa || true",
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "AWS_REGION": "us-east-1",
+    "AWS_ACCESS_KEY_ID": "minioadmin",
+    "AWS_SECRET_ACCESS_KEY": "minioadmin",
+    "S3_ENDPOINT": "http://host.docker.internal:9000",
+    "MANIFEST_STORE_DB_URL": "postgresql+psycopg://mlops:mlops@host.docker.internal:5432/mlops?options=-csearch_path%3Dmanifest_store",
+    "MLFLOW_DB_URL": "postgresql+psycopg://mlops:mlops@host.docker.internal:5432/mlops?options=-csearch_path%3Dmlflow",
+    "RUSTFS_S3_ENDPOINT": "http://host.docker.internal:9000",
+    "RUSTFS_ACCESS_KEY": "rustfsadmin",
+    "RUSTFS_SECRET_KEY": "rustfspassword",
+    "RUSTFS_BUCKET_MANIFEST_STORE": "manifest-store",
+    "RUSTFS_BUCKET_MLFLOW": "mlflow-artifacts",
+    "RAW_BUCKET": "image-raw",
+    "AUGMENTED_BUCKET": "image-augmented",
+    "NORMALIZED_BUCKET": "image-normalized",
+    "TRAINING_BUCKET": "image-training",
+    "INFERENCE_INPUT_BUCKET": "image-inference-input",
+    "HITL_BUCKET": "image-hitl",
+    "OUTPUT_BUCKET": "image-output",
+    "MANIFEST_STORE_BUCKET": "manifest-store",
+    "NVME_ROOT": "/mnt/nvme",
+    "NVME_MIN_GB": "100",
+    "MLFLOW_TRACKING_URL": "http://host.docker.internal:5000",
+    "MLFLOW_REGISTRY_URL": "http://host.docker.internal:5000",
+    "METRICS_ENABLED": "true",
+    "METRICS_PORT": "8000",
+    "EDITOR": "nvim",
+    "VISUAL": "nvim"
+  },
+  "runArgs": [
+    "--extra-hosts=host.docker.internal:host-gateway",
+    "--privileged"
+  ],
+  "mounts": [
+    "source=${localWorkspaceFolder}/.cache/pip,target=/root/.cache/pip,type=bind",
+    "source=${localWorkspaceFolder}/.cache/uv,target=/root/.cache/uv,type=bind"
+  ],
+  "portsAttributes": {
+    "5000": {
+      "label": "MLflow Tracking",
+      "onAutoForward": "openPreview"
+    },
+    "9000": {
+      "label": "MinIO/S3",
+      "onAutoForward": "openPreview"
+    },
+    "9001": {
+      "label": "MinIO Console",
+      "onAutoForward": "openPreview"
+    },
+    "8000": {
+      "label": "Prometheus Metrics",
+      "onAutoForward": "notify"
+    }
+  },
+  "forwardPorts": [5000, 9000, 9001, 8000]
+}

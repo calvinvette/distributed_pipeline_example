@@ -1,0 +1,10 @@
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/duduribeiro/devcontainer-features/neovim:1": { 
+	    "version": "stable" 
+    },
+    "ghcr.io/duduribeiro/devcontainer-features/tmux:1": {
+            "version": "latest"
+    }
+  }
+

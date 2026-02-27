@@ -1,0 +1,19 @@
+# Behavior: on git commit, any staged .ipynb will be rewritten with outputs removed. 
+#  You’ll typically see the hook “fail” the first time because it modified files; 
+#  then you git add and commit again. That is standard pre-commit behavior.
+repos:
+  # Basic hygiene (optional, but generally useful)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-yaml
+
+  # Strip ALL Jupyter notebook outputs (and execution counts)
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.7.1
+    hooks:
+      - id: nbstripout
+        files: \.ipynb$

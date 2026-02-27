@@ -1,0 +1,78 @@
+name: Publish to AWS CodeArtifact (PyPI)
+
+on:
+  push:
+    tags:
+      - "v*.*.*"   # publish on version tags like v1.2.3
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write   # required for GitHub OIDC -> AWS
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-east-1                 # <-- set
+      CODEARTIFACT_DOMAIN: my-domain        # <-- set
+      CODEARTIFACT_REPOSITORY: my-repo      # <-- set
+      # If cross-account domain: set CODEARTIFACT_DOMAIN_OWNER as well
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          uv --version
+
+      - name: Install deps (dev) + run tests
+        run: |
+          uv sync --extra dev --frozen
+          uv run pytest
+
+      - name: Build dists
+        run: |
+          rm -rf dist
+          uv build --no-sources
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v5.1.1
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/github-codeartifact-publish
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Fetch CodeArtifact token + repo endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TOKEN="$(aws codeartifact get-authorization-token \
+            --domain "$CODEARTIFACT_DOMAIN" \
+            --query authorizationToken --output text)"
+
+          ENDPOINT="$(aws codeartifact get-repository-endpoint \
+            --domain "$CODEARTIFACT_DOMAIN" \
+            --repository "$CODEARTIFACT_REPOSITORY" \
+            --format pypi \
+            --query repositoryEndpoint --output text)"
+
+          echo "CODEARTIFACT_AUTH_TOKEN=$TOKEN" >> $GITHUB_ENV
+          echo "CODEARTIFACT_PUBLISH_URL=$ENDPOINT" >> $GITHUB_ENV
+
+      - name: Publish with uv
+        run: |
+          uv publish \
+            --publish-url "${CODEARTIFACT_PUBLISH_URL}" \
+            --username aws \
+            --password "${CODEARTIFACT_AUTH_TOKEN}" \
+            dist/*
