@@ -4,6 +4,17 @@ FROM mcr.microsoft.com/devcontainers/python:1-3.12-bookworm
 # NeoVim, TMux, and Development Tools
 # ============================================================================
 
+#RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+#RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | gpg --dearmor | sudo tee /usr/share/keyrings/yarnkey.gpg >/dev/null
+#RUN ls -latr /etc/apt/sources.list.d/
+#RUN cat /etc/apt/sources.list.d/debian.sources
+#RUN cat /etc/apt/sources.list.d/yarn.list
+#RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg -o /usr/share/keyrings/yarn-keyring.gpg \
+    #&& echo "deb [arch=arm64 signed-by=/usr/share/keyrings/yarn-keyring.gpg] https://dl.yarnpkg.com/debian/ stable main" > /etc/apt/sources.list.d/yarn.list 
+RUN gpg --keyserver keyserver.ubuntu.com --recv-keys 23E7166788B63E1E
+
+
+
 # Install NeoVim (from source for latest version), TMux, and basic tooling
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git jq bash ca-certificates tmux silversearcher-ag fzf ripgrep \

@@ -1,7 +1,6 @@
 .venv/
 .env
 .env.backup_*
-.env.*
 __pycache__/
 *.pyc
 .pytest_cache/
