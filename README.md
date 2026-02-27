@@ -256,10 +256,11 @@ kubectl apply -f infra/tofu/eks/k8s-manifests.yaml
 helm install imageml-pipeline ./charts/pipeline
 ```
 
-### Running Pipeline Stages
+#### Running Pipeline Stages
 
 Once deployed, run stages via:
 
+**Using kubectl (EKS):**
 ```bash
 # Stage 1: Ingest and Augment
 kubectl run -it --rm stage1 --image=$ECR_REGISTRY/imageml-stage1:latest -- \
@@ -276,6 +277,118 @@ kubectl create job training-daily --image=$ECR_REGISTRY/imageml-stage3:latest --
 # Stage 4: Inference
 kubectl run -it --rm stage4 --image=$ECR_REGISTRY/imageml-stage4:latest -- \
   python -m stage4 --mode server
+```
+
+**Using AWS CLI (ECS Tasks):**
+
+First, ensure your ECS cluster is running:
+```bash
+# Create ECS cluster (if needed)
+aws ecs create-cluster --cluster-name imageml-pipeline
+
+# Register task definitions (one-time setup)
+aws ecs register-task-definition --cli-input-json file://ecs-task-stage1.json
+aws ecs register-task-definition --cli-input-json file://ecs-task-stage2.json
+aws ecs register-task-definition --cli-input-json file://ecs-task-stage3.json
+aws ecs register-task-definition --cli-input-json file://ecs-task-stage4.json
+```
+
+Then run stages as ECS tasks:
+
+```bash
+# Stage 1: Ingest and Augment (continuous polling)
+aws ecs run-task \
+  --cluster imageml-pipeline \
+  --task-definition imageml-stage1:1 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides":[{"name":"stage1","environment":[{"name":"MODE","value":"poll"}]}]}'
+
+# Stage 2: Normalize (continuous polling)
+aws ecs run-task \
+  --cluster imageml-pipeline \
+  --task-definition imageml-stage2:1 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides":[{"name":"stage2","environment":[{"name":"MODE","value":"poll"},{"name":"NORMALIZE_SIZES","value":"1080p,720p"}]}]}'
+
+# Stage 3: Training (batch job)
+aws ecs run-task \
+  --cluster imageml-pipeline \
+  --task-definition imageml-stage3:1 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides":[{"name":"stage3","command":["python","-m","stage3","--epochs","10"]}]}'
+
+# Stage 4: Inference (server mode)
+aws ecs run-task \
+  --cluster imageml-pipeline \
+  --task-definition imageml-stage4:1 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides":[{"name":"stage4","environment":[{"name":"MODE","value":"server"}]}]}'
+```
+
+**Using AWS CLI (AWS Batch - recommended for Stage 3):**
+
+```bash
+# Create compute environment (one-time)
+aws batch create-compute-environment \
+  --compute-environment-name imageml-compute \
+  --type MANAGED \
+  --compute-resources type=EC2,minvCpus=0,maxvCpus=64,instanceTypes=optimal
+
+# Create job queue
+aws batch create-job-queue \
+  --job-queue-name imageml-queue \
+  --priority 100 \
+  --compute-environments imageml-compute
+
+# Submit Stage 3 training job
+aws batch submit-job \
+  --job-name imagenet-training \
+  --job-definition imageml-stage3 \
+  --job-queue imageml-queue \
+  --container-overrides '{"command":["python","-m","stage3","--epochs","10","--images-per-node","1000"]}'
+
+# Submit Stage 1 as batch job (one-time processing)
+aws batch submit-job \
+  --job-name stage1-daily \
+  --job-definition imageml-stage1 \
+  --job-queue imageml-queue \
+  --container-overrides '{"command":["python","-m","stage1","--mode","once"]}'
+```
+
+**Example ECS Task Definition (save as `ecs-task-stage1.json`):**
+```json
+{
+  "family": "imageml-stage1",
+  "networkMode": "awsvvc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole",
+  "containerDefinitions": [{
+    "name": "stage1",
+    "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/imageml-stage1:latest",
+    "essential": true,
+    "environment": [
+      {"name": "MODE", "value": "poll"},
+      {"name": "RAW_BUCKET", "value": "image-raw"},
+      {"name": "AUGMENTED_BUCKET", "value": "image-augmented"},
+      {"name": "AWS_REGION", "value": "us-east-1"}
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": "/ecs/imageml-stage1",
+        "awslogs-region": "us-east-1",
+        "awslogs-stream-prefix": "ecs"
+      }
+    }
+  }]
+}
+```
 ```
 
 ## Local Development Environment
